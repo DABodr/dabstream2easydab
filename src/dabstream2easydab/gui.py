@@ -289,8 +289,8 @@ class MainWindow(Gtk.ApplicationWindow):
         form_frame.add(form_grid)
 
         self.output_combo = Gtk.ComboBoxText()
-        self.output_combo.append("tcp", "Raw TCP")
         self.output_combo.append("zmq", "ZeroMQ")
+        self.output_combo.append("tcp", "Raw TCP")
         self.output_combo.connect("changed", self._on_output_changed)
 
         self.output_profile_combo = Gtk.ComboBoxText()
