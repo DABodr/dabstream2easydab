@@ -51,7 +51,7 @@ class ToolInfo:
     def display_status(self) -> str:
         if self.available:
             return f"{self.source}: {self.path}"
-        return self.detail or "introuvable"
+        return self.detail or "not found"
 
 
 class ToolchainError(RuntimeError):
@@ -93,7 +93,7 @@ class Toolchain:
         if info.available:
             return info
         raise ToolchainError(
-            f"Outil requis introuvable: {tool_name}. {info.display_status}"
+            f"Required tool not found: {tool_name}. {info.display_status}"
         )
 
 
@@ -105,7 +105,7 @@ def _resolve_tool(tool_name: str, override_path: str) -> ToolInfo:
             tool_name,
             expanded,
             source="override",
-            missing_detail="chemin configure introuvable ou non executable",
+            missing_detail="configured path not found or not executable",
         )
 
     env_var = TOOL_ENV_VARS[tool_name]
@@ -116,7 +116,7 @@ def _resolve_tool(tool_name: str, override_path: str) -> ToolInfo:
             tool_name,
             expanded,
             source=f"env:{env_var}",
-            missing_detail=f"chemin {env_var} introuvable ou non executable",
+            missing_detail=f"path from {env_var} not found or not executable",
         )
 
     for bundled_dir in _bundled_dirs():
@@ -127,7 +127,7 @@ def _resolve_tool(tool_name: str, override_path: str) -> ToolInfo:
                 path=str(candidate),
                 available=True,
                 source="bundle",
-                detail="binaire integre a l'application",
+                detail="bundled with the application",
             )
 
     path_candidate = shutil.which(tool_name)
@@ -137,7 +137,7 @@ def _resolve_tool(tool_name: str, override_path: str) -> ToolInfo:
             path=path_candidate,
             available=True,
             source="system",
-            detail="trouve dans le PATH",
+            detail="found in PATH",
         )
 
     bundle_list = ", ".join(str(path) for path in _bundled_dirs())
@@ -145,7 +145,7 @@ def _resolve_tool(tool_name: str, override_path: str) -> ToolInfo:
         name=tool_name,
         available=False,
         source="missing",
-        detail=f"absent du PATH et d'aucun bundle local ({bundle_list})",
+        detail=f"not found in PATH or bundled tool directories ({bundle_list})",
     )
 
 
@@ -162,7 +162,7 @@ def _tool_info_from_candidate(
             path=str(path),
             available=True,
             source=source,
-            detail="chemin configure explicitement",
+            detail="explicitly configured path",
         )
     return ToolInfo(
         name=tool_name,

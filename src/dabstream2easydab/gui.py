@@ -43,6 +43,45 @@ AUTO_SOURCE_MODE = "auto"
 LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo.svg"
 FLOW_STALE_WARNING_SECONDS = 3.0
 FLOW_STALE_OFFLINE_SECONDS = 8.0
+CONNECTION_BUTTON_CSS = """
+button.connection-toggle {
+  background-image: none;
+  background-color: #1677ff;
+  border: 1px solid #0f5fd6;
+  border-radius: 12px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.02em;
+  padding: 6px 12px;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.18);
+}
+
+button.connection-toggle:hover {
+  background-color: #0f6ae6;
+  box-shadow: 0 6px 14px rgba(22, 119, 255, 0.22);
+}
+
+button.connection-toggle:active {
+  background-color: #0d5fcc;
+  box-shadow: none;
+}
+
+button.connection-toggle.connected {
+  background-color: #f97316;
+  border: 1px solid #dd6b20;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.18);
+}
+
+button.connection-toggle.connected:hover {
+  background-color: #ea6a12;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.22);
+}
+
+button.connection-toggle.connected:active {
+  background-color: #d95f10;
+  box-shadow: none;
+}
+"""
 
 
 def load_settings() -> dict:
@@ -135,14 +174,12 @@ class MainWindow(Gtk.ApplicationWindow):
         buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         root.pack_start(buttons, False, False, 0)
 
-        self.start_button = Gtk.Button(label="Connect")
-        self.start_button.connect("clicked", self._on_start_clicked)
-        buttons.pack_start(self.start_button, False, False, 0)
-
-        self.stop_button = Gtk.Button(label="Disconnect")
-        self.stop_button.set_sensitive(False)
-        self.stop_button.connect("clicked", self._on_stop_clicked)
-        buttons.pack_start(self.stop_button, False, False, 0)
+        self.connection_button = Gtk.Button(label="Connect")
+        self.connection_button.set_size_request(116, -1)
+        self.connection_button.connect("clicked", self._on_connection_button_clicked)
+        buttons.pack_start(self.connection_button, False, False, 0)
+        self._install_connection_button_style()
+        self._update_connection_button()
 
         self.flow_status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.flow_status_box.set_margin_start(8)
@@ -752,8 +789,37 @@ class MainWindow(Gtk.ApplicationWindow):
         self.odr_edi2edi_path_entry.set_sensitive(enabled)
         self.eti2zmq_path_entry.set_sensitive(enabled)
         self._update_saved_stream_actions()
-        self.start_button.set_sensitive(enabled)
-        self.stop_button.set_sensitive(not enabled)
+        self._update_connection_button()
+
+    def _install_connection_button_style(self) -> None:
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CONNECTION_BUTTON_CSS.encode("utf-8"))
+        style_context = self.connection_button.get_style_context()
+        style_context.add_provider(
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+        style_context.add_class("connection-toggle")
+
+    def _update_connection_button(self) -> None:
+        if self.session is None:
+            label = "Connect"
+            tooltip = "Start the relay and connect to the selected stream"
+            connected = False
+        else:
+            label = "Disconnect"
+            tooltip = "Stop the current relay session"
+            connected = True
+
+        self.connection_button.set_label(label)
+        self.connection_button.set_tooltip_text(tooltip)
+        self.connection_button.set_sensitive(True)
+
+        style_context = self.connection_button.get_style_context()
+        if connected:
+            style_context.add_class("connected")
+        else:
+            style_context.remove_class("connected")
 
     def _set_flow_status_indicator(self, status: str, detail: str = "") -> None:
         if status == "online":
@@ -808,11 +874,33 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _refresh_toolchain_status(self) -> None:
         self._toolchain = Toolchain.discover(self._current_tool_overrides())
-        self.edi2eti_status.set_text(self._toolchain.edi2eti.display_status)
-        self.odr_edi2edi_status.set_text(self._toolchain.odr_edi2edi.display_status)
-        self.eti2zmq_status.set_text(self._toolchain.eti2zmq.display_status)
+        self._set_tool_status_label(self.edi2eti_status, self._toolchain.edi2eti)
+        self._set_tool_status_label(
+            self.odr_edi2edi_status,
+            self._toolchain.odr_edi2edi,
+        )
+        self._set_tool_status_label(self.eti2zmq_status, self._toolchain.eti2zmq)
 
-    def _on_start_clicked(self, _button) -> None:
+    def _set_tool_status_label(self, label: Gtk.Label, tool_info) -> None:
+        if tool_info.available:
+            markup = (
+                f"{GLib.markup_escape_text(tool_info.display_status)} "
+                "<span foreground='#2f9e44' weight='bold'>OK</span>"
+            )
+            label.set_markup(markup)
+            label.set_tooltip_text(tool_info.path)
+            return
+
+        label.set_text(tool_info.display_status)
+        label.set_tooltip_text(tool_info.display_status)
+
+    def _on_connection_button_clicked(self, _button) -> None:
+        if self.session is None:
+            self._on_start_clicked()
+            return
+        self._stop_session()
+
+    def _on_start_clicked(self) -> None:
         if self.session is not None:
             return
         self._refresh_toolchain_status()
@@ -845,12 +933,10 @@ class MainWindow(Gtk.ApplicationWindow):
             self._show_error_dialog("Unable to start the session", str(exc))
             return
         self._set_inputs_sensitive(False)
+        self._update_connection_button()
         self._set_flow_status_indicator("connecting", "Connecting to stream")
         self.append_log("Session started")
         self._update_easydab_hint()
-
-    def _on_stop_clicked(self, _button) -> None:
-        self._stop_session()
 
     def _stop_session(self) -> None:
         if self.session is None:
@@ -858,6 +944,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.session.stop()
         self.session = None
         self._set_inputs_sensitive(True)
+        self._update_connection_button()
         self._set_flow_status_indicator("offline", "Session stopped")
         self.append_log("Session stopped")
 
@@ -883,10 +970,12 @@ class MainWindow(Gtk.ApplicationWindow):
             self.bytes_value.set_text("0")
             self.recognized_type_value.set_text("-")
             self.error_value.set_text("-")
+            self._update_connection_button()
             self._set_flow_status_indicator("offline", "Session stopped")
             return True
 
         stats = self.session.snapshot()
+        self._update_connection_button()
         self.state_value.set_text(stats.state)
         if self.session.output_mode == "zmq":
             self.clients_value.set_text("n/a")

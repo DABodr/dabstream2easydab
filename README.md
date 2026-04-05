@@ -32,45 +32,14 @@ status panel, and the full configuration area.
 
 ## Installation
 
-### Option 1: Install from a Debian package
-
-This is the recommended option for end users.
-
-The `.deb` package includes:
-
-- the GTK application
-- the desktop launcher and menu entry
-- the application icon
-- bundled copies of `edi2eti`, `eti2zmq`, and `odr-edi2edi`
-
-You do not need to install those three external tools separately when using the
-`.deb` package.
-
-Install a package with:
-
-```bash
-sudo apt install ./dist/dabstream2easydab_0.1.0-1_amd64.deb
-```
-
-Runtime dependencies are handled by the package manager. On Debian/Ubuntu, the
-package declares the required libraries and Python runtime components,
-including:
-
-- `python3`
-- `python3-gi`
-- `gir1.2-gtk-3.0`
-- `python3-zmq`
-- standard runtime libraries such as `libc6`, `libstdc++6`, and `libzmq5`
-
-### Option 2: Install from source
-
-This is the recommended option for development or local modifications.
-
-Use the automated installer:
+The recommended installation method is the provided source installer:
 
 ```bash
 ./scripts/install-app.sh
 ```
+
+It installs the GTK application, builds the required external tools, and
+creates a local launcher plus a desktop entry inside the user profile.
 
 It is better to run this script without `sudo`.
 It will only elevate the `apt` part when needed, while keeping the application
@@ -84,7 +53,7 @@ The script:
 - creates a launcher at `~/.local/bin/dabstream2easydab`
 - creates a local desktop entry
 
-System packages used by the source installer:
+System packages used by the installer:
 
 - `ca-certificates`
 - `python3`
@@ -122,70 +91,13 @@ In that manual case, you still need working `edi2eti`, `eti2zmq`, and
 `odr-edi2edi` binaries from one of the supported lookup locations described
 below.
 
-## Building a Debian Package
-
-You can build an installable `.deb` package with the desktop launcher, the menu
-entry, the icon, and the bundled toolchain:
-
-```bash
-./scripts/build-deb.sh
-```
-
-The generated package is written to `dist/`. Install it with:
-
-```bash
-sudo apt install ./dist/dabstream2easydab_0.1.0-1_amd64.deb
-```
-
-Architecture notes:
-
-- one `.deb` file is produced per architecture
-- supported native targets are `i386` (32-bit x86), `amd64` (x64), and `arm64`
-- native build from the matching architecture is supported directly
-- cross-package assembly from another architecture is also possible with
-  `--skip-tools --tool-dir ...` if you already have prebuilt target binaries
-  for `edi2eti`, `eti2zmq`, and `odr-edi2edi`
-
-Useful options:
-
-```bash
-./scripts/build-deb.sh --arch amd64
-./scripts/build-deb.sh --arch arm64 --skip-tools --tool-dir /path/to/arm64-tools
-./scripts/build-deb.sh --output-dir release
-./scripts/build-deb.sh --skip-tools
-./scripts/build-deb.sh --force-rebuild
-```
-
-`--skip-tools` reuses compatible `edi2eti`, `eti2zmq`, and `odr-edi2edi`
-binaries already available from `.deb-build/`, `tools/bin/`, or the system
-`PATH`.
-
-If you want to build the `.deb` with bundled tools on the local machine, install
-the Debian build dependencies first:
-
-```bash
-sudo apt install build-essential git autoconf automake libtool pkg-config dpkg-dev libzmq3-dev libfec-dev
-```
-
-The application can also use locally integrated tools:
-
-- `edi2eti`
-- `odr-edi2edi`
-- `eti2zmq`
-
-Lookup order:
+Tool lookup order:
 
 1. explicit path set in the interface
 2. environment variables `DABSTREAM_EDI2ETI`, `DABSTREAM_ODR_EDI2EDI`,
    `DABSTREAM_ETI2ZMQ`
-3. binaries copied to `tools/bin/`
+3. bundled binaries installed with the application
 4. system `PATH`
-
-To populate the local bundle from tools already installed on the machine:
-
-```bash
-./scripts/integrate-mmbtools.sh
-```
 
 ## Running
 
